@@ -36,7 +36,7 @@ class Compile extends React.Component {
 
 		// Send the request.
 		Request
-			.post(C.LOCAL.API)
+			.post("/build")
 			.set('Content-Type', 'application/json')
 			.send(config)
 			.end((err, res) => {
