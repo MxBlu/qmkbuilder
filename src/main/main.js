@@ -5,8 +5,6 @@ const Keyboard = require('state/keyboard');
 const C = require('const');
 const Utils = require('utils');
 
-const Request = require('superagent');
-
 class Main extends React.Component {
 
 	constructor(props) {
@@ -15,7 +13,6 @@ class Main extends React.Component {
 		// Bind functions.
 		this.upload = this.upload.bind(this);
 		this.useKLE = this.useKLE.bind(this);
-		this.usePreset = this.usePreset.bind(this);
 	}
 
 	/*
@@ -74,40 +71,6 @@ class Main extends React.Component {
 		}
 	}
 
-	/*
-	 * Use a preset.
-	 *
-	 * @param {String} id The id of the preset.
-	 */
-	usePreset(id) {
-		const state = this.props.state;
-
-		Request
-			.get(C.LOCAL.PRESETS + id + '.json')
-			.end((err, res) => {
-				if (err) return state.error('Unable to load preset.');
-
-				try {
-					// Deserialize the contents.
-					const deserialized = JSON.parse(res.text);
-
-					// Ensure the version is correct.
-					if (deserialized.version !== C.VERSION) throw 'version mismatch';
-
-					// Build a new keyboard.
-					const keyboard = Keyboard.deserialize(state, deserialized.keyboard);
-
-					state.update({
-						keyboard: keyboard,
-						screen: C.SCREEN_KEYMAP // Switch to the keymap screen.
-					});
-				} catch (e) {
-					console.error(e);
-					state.error('Invalid configuration');
-				}
-			});
-	}
-
 	render() {
 		const state = this.props.state;
 
@@ -130,21 +93,6 @@ class Main extends React.Component {
 				onClick={ this.useKLE }>
 				Import
 			</button>
-			<br/><br/>
-			<h3>Or choose a preset layout</h3>
-			{(() => {
-				const presets = [];
-				for (const preset in C.PRESETS) {
-					presets.push(<button
-						className='light block'
-						onClick={ () => this.usePreset(preset) }
-						key={ preset }>
-						{ C.PRESETS[preset] }
-					</button>);
-					presets.push(<div style={{ height: '0.5rem' }} key={ '-key-' + preset }/>);
-				}
-				return presets;
-			})()}
 		</div>;
 	}
 
