@@ -1,6 +1,5 @@
 const React = require('react');
 
-const Files = require('files');
 const Utils = require('utils');
 
 const Request = require('superagent');
@@ -14,7 +13,6 @@ class Compile extends React.Component {
 
 		// Bind functions.
 		this.downloadHex = this.downloadHex.bind(this);
-		this.downloadZip = this.downloadZip.bind(this);
 	}
 
 	downloadHex() {
@@ -24,14 +22,23 @@ class Compile extends React.Component {
 		// Disable buttons.
 		state.ui.set('compile-working', true);
 
-		// Generate source files.
-		const files = Files.generate(keyboard);
+		// Get a friendly name for the keyboard.
+		const friendly = keyboard.settings.name ? Utils.generateFriendly(keyboard.settings.name) : 'layout';
+
+		// Serialize the keyboard.
+		const serialized = keyboard.serialize();
+
+		// Create the configuration.
+		const config = JSON.stringify({
+			version: C.VERSION,
+			keyboard: serialized
+		});
 
 		// Send the request.
 		Request
 			.post(C.LOCAL.API)
 			.set('Content-Type', 'application/json')
-			.send(JSON.stringify(files))
+			.send(config)
 			.end((err, res) => {
 				res = JSON.parse(res.text);
 
@@ -62,53 +69,6 @@ class Compile extends React.Component {
 			});
 	}
 
-	downloadZip() {
-		const state = this.props.state;
-		const keyboard = state.keyboard;
-
-		// Disable buttons.
-		state.ui.set('compile-working', true);
-
-		// Generate source files.
-		const files = Files.generate(keyboard);
-
-		// Get the firmware stencil.
-		JSZipUtils.getBinaryContent('/files/firmware.zip', (err, data) => {
-			if (err) {
-				console.error(err);
-				state.error('Unable to retrieve files');
-				state.ui.set('compile-working', false);
-				return;
-			}
-
-			JSZip.loadAsync(data).then(zip => {
-				// Insert the files.
-				for (const file in files) {
-					zip.file(file, files[file]);
-				}
-
-				// Download the file.
-				zip.generateAsync({ type: 'blob' }).then(blob => {
-					// Generate a friendly name.
-					const friendly = keyboard.settings.name ? Utils.generateFriendly(keyboard.settings.name) : 'layout';
-
-					saveAs(blob, friendly + '.zip');
-
-					// Re-enable buttons.
-					state.ui.set('compile-working', false);
-				}).catch(e => {
-					console.error(err);
-					state.error('Unable to generate files');
-					state.ui.set('compile-working', false);
-				});
-			}).catch(e => {
-				console.error(err);
-				state.error('Unable to retrieve files');
-				state.ui.set('compile-working', false);
-			});
-		});
-	}
-
 	render() {
 		const state = this.props.state;
 		const keyboard = state.keyboard;
@@ -120,15 +80,6 @@ class Compile extends React.Component {
 				disabled={ !keyboard.valid || state.ui.get('compile-working', false) }
 				onClick={ this.downloadHex }>
 				Download .hex
-			</button>
-			<div style={{ height: '1.5rem' }}/>
-			Or download the source files.
-			<div style={{ height: '0.5rem' }}/>
-			<button
-				className='light'
-				disabled={ !keyboard.valid || state.ui.get('compile-working', false) }
-				onClick={ this.downloadZip }>
-				Download .zip
 			</button>
 		</div>;
 	}

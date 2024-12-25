@@ -39,15 +39,20 @@ app.use(Express.static(envSTATIC));
 // Set up the /build route.
 app.post('/build', (req, res) => {
 	// Get the files.
-	const files = req.body;
+	const configuration = req.body
 
 	// Create a temporary directory.
 	const key = Crypto.randomBytes(16).toString('hex');
-  const tmpdir = envTMP + key;
+	const tmpdir = envTMP + key;
+	const configurationFileName = `/tmp/${key}.json`;
+
+	// Keyboard name from configuration
+	const kbname = configuration?.keyboard?.settings?.name;
 
 	// Setup helper functions.
 	const clean = () => {
 		Exec('rm -rf ' + tmpdir);
+		Exec('rm ' + configurationFileName);
 	};
 
 	const sendError = err => {
@@ -56,39 +61,69 @@ app.post('/build', (req, res) => {
 		clean();
 	};
 
+	
+	console.log(`Build request received for ${kbname}`);
+
 	// Start.
 	co(function*() {
 
-		// Copy the base stencil.
+		/*
+			1. cd into master qmk dir
+			2. git pull
+			3. copy master qmk to temp qmk
+			4. set QMK_HOME to tmp qmk
+			5. save json to /tmp
+			6. qmk import-kbfirmware /tmp/keyboard.json
+		*/
+
+		// Ensure QMK up to date
 		yield new Promise((resolve, reject) => {
-			Exec('cp -rp ' + envQMK + ' ' + tmpdir, (err, stdout, stderr) => {
-				if (err) return reject('Failed to initialize.');
+			Exec(`cd ${envQMK} && git pull`, (err, stdout, stderr) => {
+				if (err) return reject('Failed to update QMK');
+				console.log("Ensured QMK up to date");
 				resolve();
 			});
 		});
 
-		// Copy all the files.
-		for (const file in files) {
-			yield new Promise((resolve, reject) => {
-				const fileName = file.replace('qmk_firmware', tmpdir);
-				Fs.writeFile(fileName, files[file], err => {
-					if (err) return reject('Failed to initialize.');
-					resolve();
-				});
-			});
-		}
-
-		// Make.
+		// Copy QMK to temp folder
 		yield new Promise((resolve, reject) => {
-			Exec('cd ' + tmpdir + '/keyboards/kb && make', (err, stdout, stderr) => {
+			Exec(`rsync -a ${envQMK}/ ${tmpdir} --exclude keyboards`, (err, stdout, stderr) => {
 				if (err) return reject(stderr);
+				console.log(`Copied temp QMK dir: ${tmpdir}`);
+				resolve();
+			});
+		});
+
+		// Save config json to tmp
+		yield new Promise((resolve, reject) => {
+			Fs.writeFile(configurationFileName, JSON.stringify(configuration), err => {
+				if (err) return reject('Failed to save configuration.');
+				console.log(`Saved configuration: ${configurationFileName}`);
+				resolve();
+			});
+		});
+
+		// Convert configuration to QMK format
+		yield new Promise((resolve, reject) => {
+			Exec(`qmk import-kbfirmware ${configurationFileName}`, { env: { ...process.env, "QMK_HOME": tmpdir } }, (err, stdout, stderr) => {
+				if (err) return reject(stderr);
+				console.log(`Imported configuration: ${configurationFileName}`);
+				resolve();
+			});
+		});
+
+		// Compile firmware
+		yield new Promise((resolve, reject) => {
+			Exec(`qmk compile -kb ${kbname.toLowerCase()} -km default`, { env: { ...process.env, "QMK_HOME": tmpdir } }, (err, stdout, stderr) => {
+				if (err) return reject(stderr);
+				console.log(`Compiled firmware: ${tmpdir}/${kbname.toLowerCase()}_default.hex`);
 				resolve();
 			});
 		});
 
 		// Read the hex file.
 		const hex = yield new Promise((resolve, reject) => {
-			Fs.readFile(tmpdir + '/kb_default.hex', 'utf8', (err, data) => {
+			Fs.readFile(`${tmpdir}/${kbname.toLowerCase()}_default.hex`, 'utf8', (err, data) => {
 				if (err) return reject('Failed to read hex file.');
 				resolve(data);
 			});
