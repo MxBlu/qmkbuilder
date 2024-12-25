@@ -25,17 +25,19 @@ WORKDIR /server
 COPY package.json package-lock.json .
 RUN npm i
 
-ENV HOST_URL=http://localhost:8080
-
-RUN echo $'module.exports = {
-	"API": "$HOST_URL/build",
-	"PRESETS": "$HOST_URL/presets"
-}' > src/const/local.js
-
-# Compile client
+# Copy client source/build tools
 COPY deploy.js .
 COPY static ./static
 COPY src ./src
+
+# Create local.js
+ENV HOST_URL=http://localhost:8080
+RUN echo $'module.exports = {\n\
+	"API": "$HOST_URL/build",\n\
+	"PRESETS": "$HOST_URL/presets"\n\
+}' > src/const/local.js
+
+# Compile client
 RUN npm run deploy
 
 # Copy server
