@@ -8,9 +8,6 @@ RUN python3 -m pip install --break-system-packages pipx
 ENV QMK_CLI_VERSION=1.1.6
 RUN pipx install --global qmk
 
-# Run QMK setup just to install deps, cleanup after
-RUN qmk setup -y && rm -rf /root/qmk_firmware
-
 # Setup runtime user
 RUN adduser qmk
 USER qmk
@@ -18,6 +15,11 @@ USER qmk
 # Clone QMK for runtime use
 ENV QMK_FIRMWARE_BAKEDPULL=20241225
 RUN qmk setup -y
+
+# Switch back to root to install compilation tools
+USER root
+RUN QMK_HOME=/home/qmk/qmk_firmware qmk setup -y
+USER qmk
 
 WORKDIR /server
 
