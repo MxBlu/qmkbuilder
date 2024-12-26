@@ -21,6 +21,9 @@ USER root
 RUN QMK_HOME=/home/qmk/qmk_firmware qmk setup -y
 USER qmk
 
+# Make an empty git repo
+RUN mkdir /home/qmk/empty_repo && cd /home/qmk/empty_repo && git init
+
 WORKDIR /server
 
 # Install node deps
@@ -42,5 +45,6 @@ EXPOSE 80
 
 ENV STATIC="/server/static"
 ENV QMK="/home/qmk/qmk_firmware"
+ENV EMPTY_REPO="/home/qmk/empty_repo"
 
 CMD node server/index.js

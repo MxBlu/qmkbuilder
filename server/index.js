@@ -26,10 +26,15 @@ function mergeObjects(source, destination) {
 const envTMP = process.env.TMP || '/tmp/qmk-';
 const envPORT = process.env.PORT || 80;
 const envQMK = process.env.QMK || null;
+const envEMPTY_REPO = process.env.EMPTY_REPO || null;
 const envSTATIC = process.env.STATIC || null;
 if (envQMK === null) {
   console.error('No QMK environment variable specified');
   process.exit(1);
+}
+if (envEMPTY_REPO === null) {
+	console.error('No empty repo dir set');
+	process.exit(1);
 }
 if (envSTATIC === null) {
   console.error('No STATIC environment variable specified');
@@ -97,7 +102,7 @@ app.post('/build', (req, res) => {
 		// Copy QMK to temp folder
 		yield new Promise((resolve, reject) => {
 			console.log(`Copying QMK to temp dir: ${tmpdir}`);
-			Exec(`rsync -a ${envQMK}/ ${tmpdir} --exclude keyboards`, (err, stdout, stderr) => {
+			Exec(`rsync -a ${envQMK}/ ${tmpdir} --exclude keyboards --exclude .git --exclude lib/chibios --exclude lib/chibios-contrib --exclude lib/lvgl --exclude lib/ugfx && rsync -a ${envEMPTY_REPO}/ ${tmpdir}`, (err, stdout, stderr) => {
 				if (err) return reject(stderr);
 				console.log(`Copied temp QMK dir: ${tmpdir}`);
 				resolve();
