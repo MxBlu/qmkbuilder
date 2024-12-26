@@ -24,13 +24,13 @@ USER qmk
 WORKDIR /server
 
 # Install node deps
-COPY package.json package-lock.json .
+COPY --chown qmk:qmk package.json package-lock.json .
 RUN npm i
 
 # Copy client source/build tools
-COPY deploy.js .
-COPY static ./static
-COPY src ./src
+COPY --chown qmk:qmk deploy.js .
+COPY --chown qmk:qmk static ./static
+COPY --chown qmk:qmk src ./src
 
 # Compile client
 RUN npm run deploy
