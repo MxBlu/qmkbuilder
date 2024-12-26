@@ -1,7 +1,7 @@
 const React = require('react');
 
 const CodeMirror = require('react-codemirror');
-require('codemirror/mode/clike/clike');
+require('codemirror/mode/javascript/javascript');
 
 const C = require('const');
 
@@ -12,23 +12,23 @@ class Quantum extends React.Component {
 		const keyboard = state.keyboard;
 
 		return <div className='pane-quantum'>
-			<strong>Do not touch this unless you know what you're doing!</strong>
-			<br/>
-			Edit custom Quantum functions.
+			Add custom configuration to the keyboard.json that gets generated.
+			<br />
+			
 			<div style={{ height: '0.5rem' }}/>
 			<button
 				className='light'
-				onClick={ () => { keyboard.quantum = C.QUANTUM_DEFAULT; state.update(); } }>
+				onClick={ () => { keyboard.settings.extraConfiguration = ''; state.update(); } }>
 				Reset to default
 			</button>
 			<div style={{ height: '0.5rem' }}/>
 			<div className='pane-quantum-editor'>
 				<CodeMirror
-					value={ keyboard.quantum }
-					onChange={ v => { keyboard.quantum = v; state.update(); } }
+					value={ keyboard.settings.extraConfiguration }
+					onChange={ v => { keyboard.settings.extraConfiguration = v; state.update(); } }
 					options={{
-						mode: 'text/x-c',
-						lineNumbers: true,
+						mode: 'application/json',
+						lineNumbers: false,
 						indentUnit: 4,
 						indentWithTabs: true
 					}}/>

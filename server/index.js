@@ -6,6 +6,22 @@ const Fs = require('fs');
 
 const co = require('co');
 
+function mergeObjects(source, destination) {
+    Object.keys(source).forEach(function(key_default) {
+        if (typeof destination[key_default] == "undefined") {
+            destination[key_default] = source[key_default];
+        } else if (isObject(source[key_default]) && isObject(destination[key_default])) {
+            mergeObjects(source[key_default], destination[key_default]);
+        }
+    });
+
+    function isObject(object) {
+        return Object.prototype.toString.call(object) === '[object Object]';
+    }
+
+    return destination;
+}
+
 // Get environment variables.
 const envTMP = process.env.TMP || '/tmp/qmk-';
 const envPORT = process.env.PORT || 80;
@@ -48,6 +64,8 @@ app.post('/build', (req, res) => {
 
 	// Keyboard name from configuration
 	const kbname = configuration?.keyboard?.settings?.name;
+	// Extra configuration to merge in
+	const extraConfiguration = configuration?.keyboard?.settings?.extraConfiguration ?? '';
 
 	// Setup helper functions.
 	const clean = () => {
@@ -67,15 +85,6 @@ app.post('/build', (req, res) => {
 	// Start.
 	co(function*() {
 
-		/*
-			1. cd into master qmk dir
-			2. git pull
-			3. copy master qmk to temp qmk
-			4. set QMK_HOME to tmp qmk
-			5. save json to /tmp
-			6. qmk import-kbfirmware /tmp/keyboard.json
-		*/
-
 		// Ensure QMK up to date
 		yield new Promise((resolve, reject) => {
 			Exec(`cd ${envQMK} && git pull`, (err, stdout, stderr) => {
@@ -87,6 +96,7 @@ app.post('/build', (req, res) => {
 
 		// Copy QMK to temp folder
 		yield new Promise((resolve, reject) => {
+			console.log(`Copying QMK to temp dir: ${tmpdir}`);
 			Exec(`rsync -a ${envQMK}/ ${tmpdir} --exclude keyboards`, (err, stdout, stderr) => {
 				if (err) return reject(stderr);
 				console.log(`Copied temp QMK dir: ${tmpdir}`);
@@ -112,6 +122,42 @@ app.post('/build', (req, res) => {
 			});
 		});
 
+		// Add in extra configuration if present
+		if (extraConfiguration.trim().length > 0) {
+			// Parse extra configuration
+			const extraConfigJson = yield new Promise((resolve, reject) => {
+				try {
+					const extraConfigJson = JSON.parse(extraConfiguration);
+					if (extraConfigJson == null) {
+						return reject("Extra configuration is not valid JSON");
+					}
+					resolve(extraConfigJson);
+				} catch (e) {
+					return reject("Extra configuration is not valid JSON");
+				}
+			});
+
+			// Get generated keyboard.json
+			const keyboardJson = yield new Promise((resolve, reject) => {
+				Fs.readFile(`${tmpdir}/keyboards/${kbname.toLowerCase()}/keyboard.json`, 'utf8', (err, data) => {
+					if (err) return reject('Failed to read keyboard.json file.');
+					resolve(JSON.parse(data));
+				});
+			});
+
+			// Merge the generated keyboard.json and the extra configuration
+			mergeObjects(extraConfigJson, keyboardJson);
+
+			// Save new keyboard.json
+			yield new Promise((resolve, reject) => {
+				Fs.writeFile(`${tmpdir}/keyboards/${kbname.toLowerCase()}/keyboard.json`, JSON.stringify(keyboardJson), err => {
+					if (err) return reject('Failed to save updated keyboard.json.');
+					console.log(`Saved updated keyboard.json: ${tmpdir}/keyboards/${kbname.toLowerCase()}/keyboard.json`);
+					resolve();
+				});
+			});
+		}
+			
 		// Compile firmware
 		yield new Promise((resolve, reject) => {
 			Exec(`qmk compile -kb ${kbname.toLowerCase()} -km default`, { env: { ...process.env, "QMK_HOME": tmpdir } }, (err, stdout, stderr) => {
