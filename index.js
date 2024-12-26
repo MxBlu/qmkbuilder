@@ -21,3 +21,4 @@ bundle();
 function bundle() {
 	b.bundle().pipe(fs.createWriteStream('./static/js/bundle.js'));
 }
+ 
